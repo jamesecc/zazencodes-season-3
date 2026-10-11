@@ -80,7 +80,8 @@ INTAKE  (human + agent, interactive)
     /to-tickets → tickets under <ref>             │
         │                                         │
         ▼                                         ▼
-  human applies ready-for-agent             human applies ready-for-agent
+  ready-for-agent: human applies it, or     human applies ready-for-agent
+  says yes when grill asks
 
 
 BUILD  (unattended)
@@ -271,7 +272,9 @@ decisions are settled. When the user confirms there is a shared understanding,
 write the spec in Matt's `to-spec` template into `<ref>` under a `## Spec`
 heading, below the original request. Then follow `/to-tickets` with the user and
 publish the tickets under `<ref>` with their blocking edges. A small feature may
-have one ticket. Stop there: the human applies `ready-for-agent`.
+have one ticket. Finally ask "Mark <ref> ready for implementation now?" Apply
+`ready-for-agent` only on an explicit yes. Otherwise stop, and the human applies
+it later. Never apply it on your own judgement.
 
 ### /factory next, /factory \<ref> (enhancement)
 

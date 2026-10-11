@@ -23,7 +23,8 @@ The factory becomes an issue-tracker-driven pipeline with a human at both ends:
 1. **Intake (human and agent, interactive).** The owner grills each feature
    request with an agent. The result is a spec, written into the request's
    issue, and a set of tickets with blocking edges. The owner marks the issue
-   ready. Bugs are triaged and reproduced with `/triage`, then marked ready.
+   ready, either by applying the label or by telling the factory to apply it at
+   the end of the session. Bugs are triaged and reproduced with `/triage`, then marked ready.
 2. **Build (unattended).** The factory picks up a ready issue and builds it with
    `implement-spec` (implementers using `tdd` on tickets in parallel), or fixes
    a bug with `diagnosing-bugs`. It runs `code-review` once, fixes the findings,
@@ -44,7 +45,7 @@ issue tracker to use.
 1. As the owner, I want every feature request grilled with me before it is built, so that the factory builds what I mean rather than what it guessed.
 2. As the owner, I want the spec written into the original feature issue, so that the request and its spec stay in one place.
 3. As the owner, I want the spec broken into tickets with blocking edges during the interactive session, so that I approve the breakdown and the build can run unattended.
-4. As the owner, I want to apply the ready label myself, so that nothing is built until I decide it is ready.
+4. As the owner, I want to either apply the ready label myself or tell the factory at the end of the grilling and spec session that it can mark the issue ready, so that nothing is built until I decide it is ready, without an extra step when I already have.
 5. As the owner, I want the ready label to read `ready-for-implementation`, so that it matches my wording.
 6. As the owner, I want `/factory next` to build the oldest ready enhancement, so that I can work through the queue without naming issues.
 7. As the owner, I want `/factory <ref>` to build a specific issue, so that I can choose the order when I need to.
@@ -82,7 +83,7 @@ issue tracker to use.
 
 ### Intake
 - `/factory grill <ref>` runs grilling with domain modeling (glossary and ADRs updated as decisions are settled), writes the spec in the `/to-spec` template into the same issue under a `## Spec` heading, then runs `/to-tickets` with the owner. A small feature may have one ticket.
-- The owner applies the ready label. The factory never marks an issue ready.
+- At the end of `/factory grill`, the factory asks whether to mark the issue ready. It applies the label only when the owner explicitly says yes in that session. Otherwise it stops and the owner applies the label later. The factory never marks an issue ready on its own judgement.
 - Bugs go through Matt's `/triage`, which reproduces the bug before it is marked ready.
 
 ### Labels
@@ -136,6 +137,7 @@ issue tracker to use.
   - the build stops when the plugin is missing;
   - setup asks for the tracker and creates the factory labels;
   - `/factory grill` writes the spec into the same issue and creates tickets with blocking edges;
+  - `/factory grill` applies the ready label after an explicit yes, and leaves it off after a no;
   - `/factory next` ignores issues without the ready label and claims with `factory:in-progress`;
   - two sessions running `/factory next` at once take different issues;
   - a feature with two independent tickets builds them in parallel;
@@ -153,7 +155,7 @@ issue tracker to use.
 - An automated approver agent or any merge without `/factory approve`.
 - A second `code-review` pass, and `code-review` during rework.
 - Cloud-scheduled runs (Routines) and a dashboard that reads from the tracker. Scheduling and the dashboard are local.
-- The factory applying the ready label, or applying retro or audit suggestions itself.
+- The factory applying the ready label without the owner's explicit yes, or applying retro or audit suggestions itself.
 - Updating `README.md` and regenerating `.claude/` and `factory/`. The owner rebuilds those from the new prompt.
 
 ## Further Notes
@@ -165,6 +167,7 @@ issue tracker to use.
 - **Review passes:** the recommendation was up to two `code-review` passes. The owner chose one, with a check that it ran.
 - **Audit entry:** the owner added `/factory codebase audit` (freshness check, optional rerun, then grilling).
 - **Models:** the recommendation put implementers on opus and code-review on sonnet. The owner chose implementers on sonnet, code-review on opus, and the orchestrator on opus.
+- **Ready label:** the recommendation was that only the owner applies it. The owner added the option of telling the factory to apply it at the end of `/factory grill`.
 - **Trackers:** the owner required tracker independence through `/setup-matt-pocock-skills`, run at the end of the build.
 
 ### Open risks
