@@ -174,3 +174,47 @@ issue tracker to use.
 - Copied skills drift from Matt's plugin. Re-copy them deliberately and update the recorded commits.
 - Scheduled `claude -p` runs need permissions granted ahead of time. `/factory schedule` asks how.
 - The port formula repeats after 4000 issues. Collisions only matter if two such jobs run at the same time.
+
+## Pending revision (grilling in progress)
+
+A second grilling round is changing the issue lifecycle and terminology. The
+sections above, and `BUILD_PROMPT.md`, do not reflect it yet. Both will be
+updated together once the open questions below are answered.
+
+### Settled
+- **Terms**: a feature/enhancement issue is a **request**; a bug report is a
+  **bug**; an AFK sub-issue from `/to-tickets` is a **ticket** and is never a
+  job; a **job** is one factory run of type feature, bug, audit or retro (and
+  triage, if Q16 is accepted), and every job appears on the dashboard. "Issue"
+  means only the tracker record. A glossary goes at the top of
+  `BUILD_PROMPT.md`, `SPEC.md` and the factory skill.
+- **Keep Matt's skills intact.** Requests and bugs use Matt's five triage states
+  (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`,
+  `wontfix`). The earlier `ready-for-implementation` label is dropped.
+- **Nightly triage**: `/factory triage --scheduled` runs Matt's `/triage` over
+  issues with no state or `needs-triage`: gathers context, checks redundancy and
+  prior rejection, reproduces bugs, applies the category, and posts triage notes
+  with a recommended state. It may apply `needs-info`, and `needs-human` when it
+  wants a grilling session with the maintainer. It never applies
+  `ready-for-agent`, `ready-for-human` or `wontfix`, and never closes an issue.
+- **Every `/factory` command** reads the triage state labels to decide what it
+  may act on.
+- **Review requests** are labelled `ready-for-human` (Matt's meaning for a PR:
+  ready for a human to merge), instead of a new factory label.
+
+### Open
+- **Q15**: `/factory grill` is how a `needs-triage` / `needs-human` request is
+  grilled; it ends by asking "Mark ready now?" and applies `ready-for-agent`.
+  A reproduced bug recommended `ready-for-agent` needs only a one-word yes.
+- **Q16**: the nightly run is a `triage` job on the dashboard with a summary
+  report, no tracker issue, and its card replaced each night.
+- **Q17**: while a request's review request is open, the request must not be
+  picked up again by `/factory next`. Proposal: it keeps `ready-for-agent` plus
+  `factory:in-progress` until `/factory approve` closes it, and `/factory next`
+  skips anything `factory:in-progress`.
+- **Q18**: `needs-human` overlaps with Matt's `needs-triage` ("maintainer needs to
+  evaluate"). Proposal: keep `needs-human` as the one factory label, meaning
+  "triage recommends a grilling session", alongside `needs-triage`.
+- **Q19**: `/factory next` tells requests from tickets by structure: it takes an
+  issue only when it is `ready-for-agent`, has a category label, and is not a
+  sub-issue.
