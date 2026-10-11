@@ -7,8 +7,26 @@ language, test command, and conventions.
 The factory is human-in-the-loop at both ends. A human grills every request into
 a spec and tickets before anything is built, and a human approves every change
 before it merges. In between, the factory builds unattended. On a schedule it
-also audits the codebase and runs a retrospective, and leaves both reports for a
-human to read.
+also triages new issues, audits the codebase and runs a retrospective, and
+leaves the results for a human to act on. Keep Matt's skills and his label
+vocabulary as intact as possible.
+
+## Glossary
+
+Use these terms exactly, in every file the factory contains. Copy this section
+to the top of `.claude/skills/factory/SKILL.md`.
+
+| Term               | Meaning                                                                                                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Issue**          | A record in the issue tracker. It holds a request, a bug or a ticket. Never "issue ticket".                                                                         |
+| **Request**        | An issue labelled `enhancement`: a feature or improvement. It is grilled into a spec and tickets.                                                                   |
+| **Bug**            | An issue labelled `bug`. It is triaged and reproduced.                                                                                                              |
+| **Spec**           | The `/to-spec` document written into a request under `## Spec`.                                                                                                     |
+| **Ticket**         | An AFK slice of a request's spec, created by `/to-tickets` as a sub-issue labelled `ready-for-agent`. It is built inside a job. It is never a job.                   |
+| **Job**            | One factory run, with one `job.json` and one card on the dashboard. Types: `feature` (one request), `bug` (one bug), `triage`, `audit`, `retro`.                      |
+| **Review request** | The pull request or merge request (or local file) that a feature or bug job ends in.                                                                                |
+| **Report**         | The `report.html` that a triage, audit or retro job writes.                                                                                                         |
+| **State label**    | One of Matt's five triage states: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. An issue has at most one.                          |
 
 ## Prerequisites
 
@@ -29,59 +47,99 @@ tracker the user describes.
   `/setup-matt-pocock-skills` writes. A "label" means whatever that file says a
   label is: a GitHub label, a GitLab label, or a `Status:` line in a local file.
 - **Label strings** come from `docs/agents/triage-labels.md`. The factory speaks
-  in Matt's roles (`ready-for-agent`, `needs-info`, `ready-for-human`, `bug`,
-  `enhancement`) and looks up the string. Recommend the user maps
-  `ready-for-agent` to `ready-for-implementation`.
+  in Matt's roles and looks up the string, so it works with renamed labels.
 - **Code host** is separate from the tracker and is detected from `git remote -v`:
   GitHub opens a pull request (`gh pr`), GitLab opens a merge request
   (`glab mr`), and no remote means a local review request, the PR body written
-  to `factory/jobs/<job-id>/review-request.md`. Below, "review request" means
-  whichever of these applies, and `<ref>` means an issue reference in the
-  tracker's own form (`#42` on GitHub or GitLab, a slug on local markdown).
+  to `factory/jobs/<job-id>/review-request.md`. Below, `<ref>` means an issue
+  reference in the tracker's own form (`#42` on GitHub or GitLab, a path or slug
+  on local markdown), and `<review>` a review request reference.
+
+## Labels and the issue lifecycle
+
+The factory adds only three labels of its own: `factory:audit`, `factory:retro`
+and `superseded`. Everything else is Matt's: the categories `enhancement` and
+`bug`, and the five state labels.
+
+```
+Request (enhancement)
+  no state / needs-triage ──nightly triage──► needs-triage + recommendation   (or needs-info)
+        │
+        ▼ /factory grill <ref>: grilling, spec, /to-tickets, "Mark ready now?" yes
+  ready-for-agent ──/factory next──► job builds ──► review request labelled ready-for-human
+        ▲                                │                          │
+        └──── job blocked: needs-triage ◄┘                          ▼ /factory approve
+                                                                 closed (with its tickets)
+
+Ticket (sub-issue of a request)
+  ready-for-agent ──built inside the request's job──► closed when the request closes
+
+Bug
+  no state / needs-triage ──nightly triage: reproduce──► needs-triage + recommendation
+        │
+        ▼ human accepts in /factory status, or grills with /factory grill <ref>
+  ready-for-agent ──/factory next bug──► job ──► review request ready-for-human ──► closed
+```
+
+- `ready-for-human` keeps Matt's meaning. On a review request it means "ready
+  for a human to merge". On a request or bug it means a person must implement it,
+  and the factory never builds it.
+- The factory changes a state label by removing the old one in the same step.
 
 ## Skills
 
 The human runs Matt's interactive skills straight from the plugin:
 `/grill-with-docs`, `/to-spec`, `/to-tickets`, `/triage`,
-`/setup-matt-pocock-skills`.
+`/setup-matt-pocock-skills`, and the model-invoked `grilling` and
+`domain-modeling`.
 
-The factory runs the rest unattended, so it ships its own adapted copies under
+The factory runs some skills unattended, so it ships adapted copies under
 `.claude/skills/`. Matt marks several of them user-invoked only, and a skill
 cannot invoke a user-invoked skill. Copy each from the plugin (or the repo
 above), remove `disable-model-invocation`, make the changes listed here and no
 others, and record the source commit in `.claude/skills/CREDITS.md`:
 
-| Skill                           | Change for the factory                                                                                               |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `implement-spec`                | Uses the `implementer` and `merger` agents. Writes `code-review.md` to the job folder. Asks the user nothing.        |
-| `tdd`                           | Seams are the ones the spec's Testing Decisions name; no confirming them with the user.                              |
-| `code-review`                   | Uses the `code-reviewer-standards` and `code-reviewer-spec` agents and writes the report to `code-review.md`.        |
-| `diagnosing-bugs`               | Used by the `diagnoser` agent. Shows hypotheses in `diagnosis.md` instead of asking the user.                        |
-| `pr`                            | Unchanged, plus a `Closes <ref>` line and, for bugs, the hypothesis that turned out correct.                         |
-| `codebase-design`               | Unchanged.                                                                                                           |
-| `improve-codebase-architecture` | Writes `report.html` to the job folder, not the OS temp dir, and records the date and `main` SHA it scanned.         |
-| `retro`                         | Reads factory jobs and session transcripts since the last retro. Writes `report.html`. Never applies a change.      |
+| Skill                           | Change for the factory                                                                                                                                                    |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `triage`                        | Scheduled mode runs steps 1 and 3 (gather context, redundancy and prior-rejection checks, verify) and posts triage notes with a recommended state. Never waits, grills, applies `ready-for-agent`, `ready-for-human` or `wontfix`, or closes. Apply mode runs step 5 for a decision the human made. |
+| `implement-spec`                | Uses the `implementer` and `merger` agents. Writes `code-review.md` to the job folder. Asks the user nothing.                                                             |
+| `tdd`                           | Seams are the ones the spec's Testing Decisions name; no confirming them with the user.                                                                                   |
+| `code-review`                   | Uses the `code-reviewer-standards` and `code-reviewer-spec` agents and writes the report to `code-review.md`.                                                             |
+| `diagnosing-bugs`               | Used by the `diagnoser` agent. Shows hypotheses in `diagnosis.md` instead of asking the user.                                                                             |
+| `pr`                            | Unchanged, plus a `Closes <ref>` line and, for bugs, the hypothesis that turned out correct.                                                                              |
+| `codebase-design`               | Unchanged.                                                                                                                                                                |
+| `improve-codebase-architecture` | Writes `report.html` to the job folder, not the OS temp dir, and records the date and `main` SHA it scanned.                                                              |
+| `retro`                         | Reads factory jobs and session transcripts since the last retro. Writes `report.html`. Never applies a change.                                                            |
 
 The orchestrator is one more skill, `/factory` (`model: opus`). Whichever Claude
 Code session runs it becomes the orchestrator for one job: it spawns every agent,
-and it is the only writer of that job's `job.json`.
+and it is the only writer of that job's `job.json`. Every `/factory` command
+reads the state labels to decide what it may act on.
 
 ## The loops (edit these to change the factory)
 
 ```
+SCHEDULED  (cron, claude -p, never asks anything)
+─────────────────────────────────────────────────
+  /factory triage --scheduled   nightly   triager (opus) over issues with no state or needs-triage
+  /factory audit --scheduled    Mon       auditor (opus)  → report.html + factory:audit issue
+  /factory retro --scheduled    Fri       retro (opus)    → report.html + factory:retro issue
+    an audit or retro supersedes the previous open one of its type
+
+
 INTAKE  (human + agent, interactive)
 ────────────────────────────────────
-  enhancement <ref>                           bug <ref>
-        │                                         │
-        ▼                                         ▼
-  /factory grill <ref>                       /triage  (plugin)
-    grilling + domain-modeling                 reproduces the bug,
-    spec (to-spec template) → into <ref>       writes an agent brief
-    /to-tickets → tickets under <ref>             │
-        │                                         │
-        ▼                                         ▼
-  ready-for-agent: human applies it, or     human applies ready-for-agent
-  says yes when grill asks
+  /factory status
+    issues by state label, each needs-triage one with its nightly recommendation;
+    jobs that are running or blocked; one word per item:
+      accept      → apply the recommended state (triage apply mode)
+      grill       → /factory grill <ref>
+      wontfix     → triage apply mode (close, .out-of-scope/ for requests)
+
+  /factory grill <ref>
+    request: grilling + domain-modeling → spec into <ref> → /to-tickets
+    bug:     grilling + domain-modeling → agent brief into <ref>
+    "Mark <ref> ready now?"  yes → ready-for-agent
 
 
 BUILD  (unattended)
@@ -105,10 +163,10 @@ BUILD  (unattended)
                     │ one implementer fixes all    │
                     └──────────────┬───────────────┘
                                    ▼
-                    verify code-review.md ──fail──► needs-human
+                    verify code-review.md ──fail──► blocked
                                    │ ok
                                    ▼
-                    pr skill → review request "Closes <ref>"
+                    pr skill → review request "Closes <ref>", ready-for-human
                                    │
                 ┌──────────────────┴──────────────────┐
                 ▼                                     ▼
@@ -117,14 +175,11 @@ BUILD  (unattended)
        close <ref> and its tickets           one implementer fixes, push
 
 
-SCHEDULED  (cron, claude -p)                 ON DEMAND  (human)
-────────────────────────────                 ──────────────────
-  /factory audit --scheduled   Mon, opus       /factory codebase audit
-  /factory retro --scheduled   Fri, opus         latest report: age, commits since
-    report.html in the job folder                rerun now, or keep it
-    + a factory:audit | factory:retro issue      grill a candidate
-    the previous open one is closed              → optional new enhancement <ref>
-    with the `superseded` label
+ON DEMAND  (human)
+──────────────────
+  /factory codebase audit
+    latest audit: age, commits since → rerun now, or keep it
+    grill a candidate → optional new request, as /factory grill does
 ```
 
 ## Target file system
@@ -132,11 +187,12 @@ SCHEDULED  (cron, claude -p)                 ON DEMAND  (human)
 ```
 .claude/
   skills/
-    factory/SKILL.md               # the orchestrator's instructions
-    implement-spec/ tdd/ code-review/ diagnosing-bugs/ pr/
+    factory/SKILL.md               # the orchestrator's instructions, glossary first
+    triage/ implement-spec/ tdd/ code-review/ diagnosing-bugs/ pr/
     codebase-design/ improve-codebase-architecture/ retro/
     CREDITS.md                     # source commit of each adapted copy
   agents/
+    triager.md                     opus    scheduled triage of one issue
     implementer.md                 sonnet  builds one ticket with tdd, in its own worktree
     merger.md                      sonnet  merges a ticket branch into the integration branch
     diagnoser.md                   opus    runs diagnosing-bugs on one bug
@@ -147,7 +203,7 @@ SCHEDULED  (cron, claude -p)                 ON DEMAND  (human)
 factory/
   dashboard.html                   # visual board, polls job.json files
   jobs/                            # gitignored runtime state, one folder per job
-    042-signup-rate-limit/
+    042-signup-rate-limit/         # a feature job
       job.json
       code-review.md
       fixes.md
@@ -157,6 +213,9 @@ factory/
       job.json
       diagnosis.md
       code-review.md
+    triage-2026-10-12/
+      job.json
+      report.html
     audit-2026-10-12/
       job.json
       report.html
@@ -171,18 +230,14 @@ docs/agents/                       # written by /setup-matt-pocock-skills
 
 ## Jobs
 
-- **Job ids**: features and bugs are `<NNN>-<slug>` from the tracker's issue
-  number (zero-padded) and a 2–4 word kebab-case slug, or `<slug>` alone on a
-  local-markdown tracker. Audit and retro jobs are `audit-<date>` and
-  `retro-<date>`.
+- **Job ids**: feature and bug jobs are `<NNN>-<slug>` from the issue number
+  (zero-padded) and a 2–4 word kebab-case slug, or `<slug>` alone on a
+  local-markdown tracker. Triage, audit and retro jobs are `<type>-<date>`.
 - **Worktrees**: the integration branch `factory/<job-id>` lives in
   `../<repo>-factory/<job-id>/`. Each ticket gets `factory/<job-id>-t<NN>` in
   `../<repo>-factory/<job-id>-t<NN>/`. The main checkout is the user's and may be
   dirty; only `/factory approve` on a local code host touches it.
 - **Ports**: the dev server port is `20000 + 10 × (issue number mod 4000) + ticket`.
-- **Factory labels**, created on first run if the tracker lacks them:
-  `factory:in-progress`, `factory:review`, `factory:audit`, `factory:retro`,
-  `superseded`.
 
 ### job.json
 
@@ -197,11 +252,12 @@ docs/agents/                       # written by /setup-matt-pocock-skills
   "review_request": null }
 ```
 
-- `type` is `feature`, `bug`, `audit` or `retro`.
+- `type` is `feature`, `bug`, `triage`, `audit` or `retro`.
 - `stage` per type:
-  - feature: `ready`, `tickets`, `code-review`, `review-request`, `merged`, `needs-human`
-  - bug: `ready`, `diagnosing`, `code-review`, `review-request`, `merged`, `needs-human`
-  - audit, retro: `report-ready`, `closed`, `superseded`
+  - feature: `tickets`, `code-review`, `review-request`, `merged`, `blocked`
+  - bug: `diagnosing`, `code-review`, `review-request`, `merged`, `blocked`
+  - triage: `running`, `report-ready`, `replaced`
+  - audit, retro: `running`, `report-ready`, `closed`, `superseded`
 - Ticket `state` is `pending`, `building` or `merged`. Review values are
   `pending`, `done` or `findings`.
 - Rewrite the whole file on every change. Paths are absolute.
@@ -227,69 +283,95 @@ What this agent reads, what it does, and which file or branch it writes.
   pasting content.
 - Every agent reads `AGENTS.md` (or `CLAUDE.md`) and the domain docs that
   `docs/agents/domain.md` lists, and uses the `GLOSSARY.md` vocabulary.
-- **Claiming**: before building, apply `factory:in-progress` to `<ref>`, then
-  re-read it. If another session got there first, pick the next item.
+- **Picking the next job**: `/factory next` takes the oldest issue that is
+  labelled `ready-for-agent` and `enhancement` (`bug` for `next bug`) and is not
+  a sub-issue, so tickets are never picked. It skips any issue that already has
+  an open review request (one whose body says `Closes <ref>`) or a job folder,
+  and moves on to the next.
+- **Claiming**: a session claims an issue by creating its job folder with
+  `mkdir factory/jobs/<job-id>` (no `-p`) after checking no folder for that issue
+  number exists. If the `mkdir` fails, another session has it: pick the next one.
 - **code-review runs once per build.** One implementer fixes every finding in a
   single pass and writes `fixes.md`. Before the review request opens, the
   orchestrator checks that `code-review.md` exists, has `## Standards` and
   `## Spec` sections, names a diff range ending at the integration branch's last
   ticket merge, and is followed by at least one fix commit or states there were
-  no findings. If any check fails, the job goes to `needs-human`.
+  no findings. If any check fails, the job is `blocked`.
 - **Blocked**: if an implementer or the diagnoser cannot finish (the spec
-  contradicts itself, a decision is missing, the environment fails), write
-  `blocked.md`, comment on `<ref>` with the reason, swap `ready-for-agent` for
-  `needs-info`, keep the worktrees, and set `needs-human`. The human re-runs
+  contradicts itself, a decision is missing, the environment fails), or the
+  code-review check fails, write `blocked.md`, comment on `<ref>` with the
+  reason, change its state from `ready-for-agent` to `needs-triage`, keep the
+  worktrees, and set the stage to `blocked`. The human re-grills with
   `/factory grill <ref>`, which reads the old spec and the block comment.
-- Every review request uses the `pr` skill. The factory never merges or pushes to
-  `main` except through `/factory approve`.
+- Every review request uses the `pr` skill and is labelled `ready-for-human`.
+  The factory never merges or pushes to `main` except through `/factory approve`.
 - **Superseding**: before a scheduled audit or retro writes its report, it finds
   any open issue of its own type, comments with a link to the new job, applies
   `superseded`, closes it, and sets that job's stage to `superseded`. A retro with
   no factory jobs since the last retro skips its run and supersedes nothing.
-- Scheduled runs never ask questions. Interactive steps (grilling, picking an
-  audit candidate) happen only in commands a human runs.
+- Scheduled runs never ask questions. Interactive steps (grilling, deciding a
+  triage recommendation, picking an audit candidate) happen only in commands a
+  human runs.
 
 ## Commands
 
 ```
-/factory grill <ref>              grill an enhancement into a spec and tickets on <ref>
-/factory next                     build the oldest ready enhancement
+/factory status                   issues by state label with triage recommendations, and jobs; act on each
+/factory grill <ref>              grill a request into a spec and tickets, or a bug into an agent brief
+/factory next                     build the oldest ready request
 /factory next bug                 fix the oldest ready bug
-/factory <ref>                    build or fix <ref>, by its bug/enhancement label
-/factory approve <review>         merge a review request into main and close its issue
+/factory <ref>                    build or fix <ref>, by its enhancement/bug label
+/factory approve <review>         merge a review request into main and close its issue and tickets
 /factory rework <review>          send a review request back with the reviewer's comments
 /factory codebase audit           read the latest audit, optionally rerun it, then grill a candidate
+/factory triage --scheduled       triage new issues (for cron)
 /factory audit --scheduled        run the architecture audit (for cron)
 /factory retro --scheduled        run the retrospective (for cron)
 /factory schedule                 show and, once confirmed, install the cron entries
 ```
 
+### /factory status
+
+List open requests and bugs grouped by state label, oldest first. For each
+`needs-triage` issue, show the latest triage recommendation and its one-line
+reason. Then list jobs that are running or `blocked`, and review requests
+labelled `ready-for-human`. The human answers per item: `accept` applies the
+recommended state with the factory's `triage` skill in apply mode, `grill`
+starts `/factory grill <ref>`, and `wontfix` runs apply mode's wontfix outcome
+(close, and write `.out-of-scope/` for a rejected request). A bug whose
+recommendation is `ready-for-agent` needs only `accept`.
+
 ### /factory grill \<ref>
 
-Read `<ref>` and its comments. Run the `grilling` and `domain-modeling` skills
-from the plugin with the user, updating `GLOSSARY.md` and ADRs as terms and
-decisions are settled. When the user confirms there is a shared understanding,
-write the spec in Matt's `to-spec` template into `<ref>` under a `## Spec`
-heading, below the original request. Then follow `/to-tickets` with the user and
-publish the tickets under `<ref>` with their blocking edges. A small feature may
-have one ticket. Finally ask "Mark <ref> ready for implementation now?" Apply
-`ready-for-agent` only on an explicit yes. Otherwise stop, and the human applies
-it later. Never apply it on your own judgement.
+Read `<ref>`, its comments and any triage notes. Run the `grilling` and
+`domain-modeling` skills from the plugin with the user, updating `GLOSSARY.md`
+and ADRs as terms and decisions are settled. When the user confirms there is a
+shared understanding:
 
-### /factory next, /factory \<ref> (enhancement)
+- For a request, write the spec in Matt's `to-spec` template into `<ref>` under
+  a `## Spec` heading, below the original request. Then follow `/to-tickets` with
+  the user and publish the tickets under `<ref>` with their blocking edges, each
+  labelled `ready-for-agent`. A small request may have one ticket.
+- For a bug, write an agent brief in the format of the `triage` skill's
+  AGENT-BRIEF.md into `<ref>`.
 
-Claim, create the job and the integration worktree from `main`, run the fresh
-checkout setup from AGENTS.md, then follow the factory's `implement-spec` skill:
-implementers on the ready tickets in parallel (each in its own worktree and
-port, with `tdd`), a merger after each, more implementers as tickets unblock,
-then `code-review` once and one fix pass. Verify `code-review.md`, then open the
-review request with the `pr` skill, apply `factory:review`, and set
+Finally ask "Mark <ref> ready now?" Apply `ready-for-agent` only on an explicit
+yes. Otherwise leave it at `needs-triage`. Never apply it on your own judgement.
+
+### /factory next, /factory \<ref> (request)
+
+Pick and claim, create the job and the integration worktree from `main`, run the
+fresh checkout setup from AGENTS.md, then follow the factory's `implement-spec`
+skill: implementers on the ready tickets in parallel (each in its own worktree
+and port, with `tdd`), a merger after each, more implementers as tickets
+unblock, then `code-review` once and one fix pass. Verify `code-review.md`, then
+open the review request with the `pr` skill, label it `ready-for-human`, and set
 `review-request`.
 
 ### /factory next bug, /factory \<ref> (bug)
 
-Claim, create the job and its worktree, and spawn the `diagnoser` with the
-triage brief. It follows `diagnosing-bugs` through all six phases, writes
+Pick and claim, create the job and its worktree, and spawn the `diagnoser` with
+the agent brief. It follows `diagnosing-bugs` through all six phases, writes
 `diagnosis.md`, and commits the regression test and fix. Then `code-review`
 once, one fix pass, verify, and the review request, as above.
 
@@ -313,9 +395,21 @@ Find the latest audit job. Tell the user how old it is in days, how many commits
 since. Offer to rerun it now. Then show the candidates, let the user pick one,
 and run `improve-codebase-architecture`'s grilling loop with `grilling` and
 `domain-modeling`. At the end ask "Turn this into a factory job?" If yes, create
-a new enhancement issue, write the spec into it and run `/to-tickets` exactly as
-`/factory grill` does, and link it from the audit issue. The audit issue stays
-open until the human closes it.
+a new request, write the spec into it, run `/to-tickets` and ask "Mark ready
+now?" exactly as `/factory grill` does, and link it from the audit issue. The
+audit issue stays open until the human closes it.
+
+### /factory triage --scheduled
+
+Create the job and mark the previous triage job `replaced`. For each open issue
+with no state label or `needs-triage` that has had no triage notes since its
+last change, spawn a `triager` with the factory's `triage` skill in scheduled
+mode. It applies the category, may apply `needs-info` when the reporter must
+answer something, otherwise sets `needs-triage`, and posts triage notes that
+start with Matt's AI disclaimer and end with a recommended state and a one-line
+reason. A recommendation of a grilling session reads "grill". Write
+`report.html`: one row per issue with what was done and what is recommended.
+Open no tracker issue for it.
 
 ### /factory audit --scheduled, /factory retro --scheduled
 
@@ -328,22 +422,26 @@ environment** (`AGENTS.md`, `CODING_STANDARDS.md`, automated checks, tooling) an
 
 ### /factory schedule
 
-Propose crontab (or launchd on macOS) entries that run
-`claude -p "/factory audit --scheduled"` on Monday morning and
-`claude -p "/factory retro --scheduled"` on Friday afternoon from the repo root,
-at minutes off the hour. Ask the user how the run should get its permissions
-(an allowlist in `.claude/settings.json` is recommended) and install the entries
-only once they confirm.
+Propose crontab (or launchd on macOS) entries, at minutes off the hour, that run
+from the repo root:
+
+- `claude -p "/factory triage --scheduled"` every night,
+- `claude -p "/factory audit --scheduled"` on Monday morning,
+- `claude -p "/factory retro --scheduled"` on Friday afternoon.
+
+Ask the user how the runs should get their permissions (an allowlist in
+`.claude/settings.json` is recommended) and install the entries only once they
+confirm.
 
 ## Dashboard
 
 One self-contained HTML file, served with `python3 -m http.server` from factory/.
 It polls every `jobs/*/job.json`. One swimlane per job type, with cards moving
 across that type's stages. Feature cards show a chip per ticket that fills in as
-tickets merge, and a Standards and a Spec chip for code-review. `needs-human`
-jobs stand out. Each card links to its issue and review request. Clicking a card
-shows its markdown files; audit and retro cards show `report.html` in a panel.
-Clean and minimal.
+tickets merge, and a Standards and a Spec chip for code-review. `blocked` jobs
+and review requests waiting on the human stand out. Each card links to its issue
+and review request. Clicking a card shows its markdown files; triage, audit and
+retro cards show `report.html` in a panel. Clean and minimal.
 
 ## After building
 
@@ -352,7 +450,7 @@ Clean and minimal.
    labels and domain doc layout. It is user-invoked only, so if the Skill tool
    refuses it, read its `SKILL.md` from the installed plugin and follow it step
    by step in this session, asking the user each question it asks.
-3. Create the factory labels in the chosen tracker, following
-   `docs/agents/issue-tracker.md`.
+3. Create the three factory labels (`factory:audit`, `factory:retro`,
+   `superseded`) in the chosen tracker, following `docs/agents/issue-tracker.md`.
 4. Tell the user which code host the factory detected for review requests, and
-   that `/factory schedule` sets up the audit and retro runs.
+   that `/factory schedule` sets up the triage, audit and retro runs.
