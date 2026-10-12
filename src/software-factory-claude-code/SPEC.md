@@ -103,7 +103,7 @@ issue tracker to use.
 - The new prompt describes the factory as it currently works (one git worktree per job, one `job.json` per job, ports per job) and builds on that. The original prompt's single `board.json` is dropped.
 
 ### Terminology
-- The glossary above is used in every factory file and copied to the top of the factory skill. "Issue ticket" is not used: an issue is a request, a bug or a ticket.
+- The glossary above is used in every factory file. The build adds it to the repo's glossary under a `## Software factory` heading in Matt's glossary format: appended to an existing `GLOSSARY.md`, as its own context in `docs/factory/GLOSSARY.md` when the repo uses a `GLOSSARY-MAP.md`, or in a new root `GLOSSARY.md` when there is none. It goes at the root rather than in `docs/`, because Matt's skills only look for the glossary there. Existing terms are never edited. "Issue ticket" is not used: an issue is a request, a bug or a ticket.
 
 ### Labels and lifecycle
 - Requests and bugs use Matt's five state labels and his `enhancement` / `bug` categories, unchanged.
@@ -180,6 +180,7 @@ issue tracker to use.
 - Build the factory from `BUILD_PROMPT.md` in a scratch repo with a test suite, once per tracker: GitHub, GitLab, local markdown. For each, check:
   - the build stops when the plugin is missing;
   - setup asks for the tracker and creates the three factory labels;
+  - the factory terms are appended to an existing `GLOSSARY.md` without changing its terms, and a root `GLOSSARY.md` is created when there is none;
   - nightly triage applies categories, reproduces a seeded bug, posts recommendations, and never applies `ready-for-agent`, `ready-for-human` or `wontfix` or closes an issue;
   - `/factory status` lists the recommendations and `accept` applies them;
   - `/factory grill` writes the spec into the same issue and creates tickets with blocking edges and `ready-for-agent`;

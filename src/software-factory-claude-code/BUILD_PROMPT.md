@@ -13,20 +13,56 @@ vocabulary as intact as possible.
 
 ## Glossary
 
-Use these terms exactly, in every file the factory contains. Copy this section
-to the top of `.claude/skills/factory/SKILL.md`.
+The factory's terms go in the repo's glossary, so every agent reads them through
+`docs/agents/domain.md` like any other domain term. After setup (see **After
+building**), add them under a `## Software factory` heading in the format of the
+`domain-modeling` skill's `GLOSSARY-FORMAT.md`:
 
-| Term               | Meaning                                                                                                                                                             |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Issue**          | A record in the issue tracker. It holds a request, a bug or a ticket. Never "issue ticket".                                                                         |
-| **Request**        | An issue labelled `enhancement`: a feature or improvement. It is grilled into a spec and tickets.                                                                   |
-| **Bug**            | An issue labelled `bug`. It is triaged and reproduced.                                                                                                              |
-| **Spec**           | The `/to-spec` document written into a request under `## Spec`.                                                                                                     |
-| **Ticket**         | An AFK slice of a request's spec, created by `/to-tickets` as a sub-issue labelled `ready-for-agent`. It is built inside a job. It is never a job.                   |
-| **Job**            | One factory run, with one `job.json` and one card on the dashboard. Types: `feature` (one request), `bug` (one bug), `triage`, `audit`, `retro`.                      |
-| **Review request** | The pull request or merge request (or local file) that a feature or bug job ends in.                                                                                |
-| **Report**         | The `report.html` that a triage, audit or retro job writes.                                                                                                         |
-| **State label**    | One of Matt's five triage states: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. An issue has at most one.                          |
+- If `GLOSSARY-MAP.md` exists, add a `Software factory` context to it, pointing
+  at `docs/factory/GLOSSARY.md`, and put the terms there.
+- Otherwise, if `GLOSSARY.md` exists, append the section to it.
+- Otherwise, create `GLOSSARY.md` at the repo root with the section.
+
+Never edit the repo's existing terms. Use these terms exactly in every file the
+factory contains.
+
+```md
+## Software factory
+
+**Issue**:
+A record in the issue tracker. It holds a request, a bug or a ticket.
+_Avoid_: issue ticket
+
+**Request**:
+An issue labelled `enhancement`: a feature or improvement, grilled into a spec and tickets.
+_Avoid_: feature ticket, story
+
+**Bug**:
+An issue labelled `bug`, triaged and reproduced before it is built.
+_Avoid_: bug request, bug ticket
+
+**Spec**:
+The `/to-spec` document written into a request under `## Spec`.
+
+**Ticket**:
+An AFK slice of a request's spec: a sub-issue labelled `ready-for-agent`, built inside a job and never a job itself.
+_Avoid_: task, AFK ticket
+
+**Job**:
+One factory run, with one `job.json` and one dashboard card, of type feature, bug, triage, audit or retro.
+_Avoid_: run, build
+
+**Review request**:
+The pull request or merge request (or local file) that a feature or bug job ends in.
+_Avoid_: PR, MR (when the code host is unknown)
+
+**Report**:
+The `report.html` that a triage, audit or retro job writes.
+
+**State label**:
+One of the five triage states `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`; an issue has at most one.
+_Avoid_: status
+```
 
 ## Prerequisites
 
@@ -187,7 +223,7 @@ ON DEMAND  (human)
 ```
 .claude/
   skills/
-    factory/SKILL.md               # the orchestrator's instructions, glossary first
+    factory/SKILL.md               # the orchestrator's instructions
     triage/ implement-spec/ tdd/ code-review/ diagnosing-bugs/ pr/
     codebase-design/ improve-codebase-architecture/ retro/
     CREDITS.md                     # source commit of each adapted copy
@@ -466,7 +502,8 @@ retro cards show `report.html` in a panel. Clean and minimal.
    labels and domain doc layout. It is user-invoked only, so if the Skill tool
    refuses it, read its `SKILL.md` from the installed plugin and follow it step
    by step in this session, asking the user each question it asks.
-3. Create the three factory labels (`factory:audit`, `factory:retro`,
+3. Add the factory's terms to the glossary, as **Glossary** describes.
+4. Create the three factory labels (`factory:audit`, `factory:retro`,
    `superseded`) in the chosen tracker, following `docs/agents/issue-tracker.md`.
-4. Tell the user which code host the factory detected for review requests, and
+5. Tell the user which code host the factory detected for review requests, and
    that `/factory schedule` sets up the triage, audit and retro runs.
