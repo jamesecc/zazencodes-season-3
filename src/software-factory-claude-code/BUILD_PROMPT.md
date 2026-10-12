@@ -204,6 +204,9 @@ INTAKE  (human + agent, interactive)
     bug:     grilling + domain-modeling → agent brief into <ref>
     "Mark <ref> ready now?"  yes → ready-for-agent
 
+  /factory <ref> on an issue that isn't ready-for-agent
+    offers the same grilling, then "Build <ref> now?"  yes → ready-for-agent → BUILD
+
 
 BUILD  (unattended)
 ───────────────────
@@ -403,7 +406,7 @@ What this agent reads, what it does, and which file or branch it writes.
 /factory grill <ref>              grill a request into a spec and tickets, or a bug into an agent brief
 /factory next                     build the oldest ready request
 /factory next bug                 fix the oldest ready bug
-/factory <ref>                    build or fix <ref>, by its enhancement/bug label
+/factory <ref>                    build or fix <ref>, by its enhancement/bug label; grill it first if it isn't ready
 /factory approve <review>         merge a review request into main and close its issue and tickets
 /factory rework <review>          send a review request back with the reviewer's comments
 /factory codebase audit           read the latest audit, optionally rerun it, then grill a candidate
@@ -440,6 +443,26 @@ shared understanding:
 
 Finally ask "Mark <ref> ready now?" Apply `ready-for-agent` only on an explicit
 yes. Otherwise leave it at `needs-triage`. Never apply it on your own judgement.
+
+### /factory \<ref> on an issue that isn't ready
+
+`/factory <ref>` is also the shortcut for grilling and building in one go. When
+`<ref>` is not `ready-for-agent`:
+
+- **Not grilled yet** (a request with no `## Spec` or no tickets, or a bug with
+  no agent brief): say so and offer to grill it now. On a yes, run the steps of
+  `/factory grill`, but end by asking "Build <ref> now?" instead of "Mark <ref>
+  ready now?". On a yes, apply `ready-for-agent` and continue into the build
+  below in the same session. On a no, leave it at `needs-triage`, as
+  `/factory grill` does.
+- **Already grilled** (spec and tickets, or agent brief, in place): ask "Mark
+  <ref> ready and build now?". On a yes, apply `ready-for-agent` and build.
+- **`needs-info`**: say it is waiting on the reporter, then offer the same as
+  above.
+- **`wontfix`, closed, or neither `enhancement` nor `bug`**: say why and stop.
+
+`/factory grill <ref>` stays for grilling without building: several requests in
+one sitting for `/factory next` to build later, or one that should wait.
 
 ### /factory next, /factory \<ref> (request)
 

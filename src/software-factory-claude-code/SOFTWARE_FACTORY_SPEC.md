@@ -97,6 +97,7 @@ issue tracker to use.
 34. As the owner, I want several factory sessions to run at once without taking the same issue, so that I can build in parallel.
 35. As the owner, I want a dashboard with a swimlane per job type, so that I can see every job's stage at a glance.
 36. As the owner, I want the build to find my setup, dev server, test, build and lint commands and ask me to confirm them, so that every job runs the same commands without my having to write `AGENTS.md` first.
+37. As the owner, I want `/factory <ref>` on a request or bug that isn't ready to offer to grill it and then build it in the same session, so that I don't need two commands when I want it built now.
 
 ## Implementation Decisions
 
@@ -129,6 +130,7 @@ issue tracker to use.
 ### Intake
 - `/factory grill <ref>` runs grilling with domain modeling (glossary and ADRs updated as decisions are settled). For a request it writes the spec in the `/to-spec` template into the same issue under `## Spec`, then runs `/to-tickets` with the owner. A small request may have one ticket. For a bug it writes an agent brief in `/triage`'s format.
 - It ends by asking "Mark <ref> ready now?" and applies `ready-for-agent` only on an explicit yes. Otherwise the issue stays at `needs-triage` and the owner applies the label later.
+- `/factory <ref>` on an issue that isn't `ready-for-agent` offers the same grilling, then asks "Build <ref> now?". A yes applies `ready-for-agent` and starts the build in the same session. An issue already grilled gets "Mark <ref> ready and build now?". A `needs-info` issue gets a warning that it is waiting on the reporter, then the same offer. A `wontfix`, closed or uncategorised issue is refused. `/factory grill` stays for grilling without building.
 
 ### Build
 - `/factory next` takes the oldest issue labelled `ready-for-agent` and `enhancement` (`bug` for `next bug`) that is not a sub-issue. It skips any issue with an open review request or a job that is running or at `review-request`, and moves to the next one.
@@ -191,6 +193,7 @@ issue tracker to use.
   - `/factory status` lists the recommendations and `accept` applies them;
   - `/factory grill` writes the spec into the same issue and creates tickets with blocking edges and `ready-for-agent`;
   - `/factory grill` applies `ready-for-agent` to the request after an explicit yes, and leaves it at `needs-triage` after a no;
+  - `/factory <ref>` on an ungrilled request offers grilling, and after "Build now?" yes creates the job in the same session; after a no, no job is created;
   - `/factory next` never picks a ticket, skips a request with an open review request, and ignores issues without `ready-for-agent`;
   - two sessions running `/factory next` at once take different issues;
   - a blocked job whose issue is marked ready again is re-run, with its earlier `blocked.md` kept;
