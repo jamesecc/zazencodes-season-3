@@ -278,7 +278,7 @@ docs/agents/                       # written by /setup-matt-pocock-skills
   dirty; only `/factory approve` on a local code host touches it.
 - **One place**: job state lives in the gitignored `factory/jobs/` of one
   checkout, so the factory runs from one machine and checkout at a time. See
-  SPEC.md, Future improvements, for running it from several places.
+  SOFTWARE_FACTORY_SPEC.md, Future improvements, for running it from several places.
 - **Dev server ports**: these are for the app under development, not the
   dashboard. Implementers on parallel tickets each start the app's dev server in
   their own worktree, so each needs its own port:
