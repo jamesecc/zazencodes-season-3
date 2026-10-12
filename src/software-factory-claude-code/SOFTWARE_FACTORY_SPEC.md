@@ -130,6 +130,7 @@ issue tracker to use.
 ### Intake
 - `/factory grill <ref>` runs grilling with domain modeling (glossary and ADRs updated as decisions are settled). For a request it writes the spec in the `/to-spec` template into the same issue under `## Spec`, then runs `/to-tickets` with the owner. A small request may have one ticket. For a bug it writes an agent brief in `/triage`'s format.
 - It ends by asking "Mark <ref> ready now?" and applies `ready-for-agent` only on an explicit yes. Otherwise the issue stays at `needs-triage` and the owner applies the label later.
+- `<ref>` accepts the tracker's form (`#42`), a bare number (`42`) or the job id (`042`). A number that is a review request rather than an issue is refused.
 - `/factory <ref>` on an issue that isn't `ready-for-agent` offers the same grilling, then asks "Build <ref> now?". A yes applies `ready-for-agent` and starts the build in the same session. An issue already grilled gets "Mark <ref> ready and build now?". A `needs-info` issue gets a warning that it is waiting on the reporter, then the same offer. A `wontfix`, closed or uncategorised issue is refused. `/factory grill` stays for grilling without building.
 
 ### Build
@@ -193,6 +194,7 @@ issue tracker to use.
   - `/factory status` lists the recommendations and `accept` applies them;
   - `/factory grill` writes the spec into the same issue and creates tickets with blocking edges and `ready-for-agent`;
   - `/factory grill` applies `ready-for-agent` to the request after an explicit yes, and leaves it at `needs-triage` after a no;
+  - `/factory 42`, `/factory #42` and `/factory 042` all act on issue #42;
   - `/factory <ref>` on an ungrilled request offers grilling, and after "Build now?" yes creates the job in the same session; after a no, no job is created;
   - `/factory next` never picks a ticket, skips a request with an open review request, and ignores issues without `ready-for-agent`;
   - two sessions running `/factory next` at once take different issues;

@@ -116,7 +116,10 @@ tracker the user describes.
   (`glab mr`), and no remote means a local review request, the PR body written
   to `factory/jobs/<job-id>/review-request.md`. Below, `<ref>` means an issue
   reference in the tracker's own form (`#42` on GitHub or GitLab, a path or slug
-  on local markdown), and `<review>` a review request reference.
+  on local markdown), and `<review>` a review request reference. Commands also
+  accept a bare number for `<ref>`: `42`, `#42` and the job id `042` all mean
+  issue #42. If the number is a review request rather than an issue, say so and
+  stop.
 
 ## Labels and the issue lifecycle
 
