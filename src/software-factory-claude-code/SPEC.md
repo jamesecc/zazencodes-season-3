@@ -130,8 +130,9 @@ issue tracker to use.
 - It ends by asking "Mark <ref> ready now?" and applies `ready-for-agent` only on an explicit yes. Otherwise the issue stays at `needs-triage` and the owner applies the label later.
 
 ### Build
-- `/factory next` takes the oldest issue labelled `ready-for-agent` and `enhancement` (`bug` for `next bug`) that is not a sub-issue. It skips any issue with an open review request or an existing job folder and moves to the next one.
-- Sessions claim an issue by creating its job folder (an atomic `mkdir`), not with a label.
+- `/factory next` takes the oldest issue labelled `ready-for-agent` and `enhancement` (`bug` for `next bug`) that is not a sub-issue. It skips any issue with an open review request or a job that is running or at `review-request`, and moves to the next one.
+- Sessions claim an issue by creating its job folder (an atomic `mkdir`), not with a label. The folder is named by the issue number alone, so two sessions taking the same issue always try to create the same folder and only one succeeds.
+- A blocked job whose issue is ready again is re-run, not skipped: `blocked.md` is kept as `blocked-<k>.md`, `attempt` goes up by one, merged tickets whose text hasn't changed are kept, and the rest are rebuilt.
 - Requests: `implement-spec` with `implementer` agents (sonnet, using `tdd`) in per-ticket worktrees and a `merger` agent (sonnet) onto the integration branch.
 - Bugs: one `diagnoser` agent (opus) following `diagnosing-bugs`.
 - Review: `code-review` runs **once**, with its Standards and Spec checks as two agents (opus). One implementer fixes every finding in a single pass. The owner rejected a second review pass.
@@ -161,7 +162,9 @@ issue tracker to use.
 - The build prompt checks that the plugin is installed and stops if not. It ends by running `/setup-matt-pocock-skills`. If the Skill tool refuses it because it is user-invoked only, the agent reads its instructions and follows them in the same session. The three factory labels are then created in the chosen tracker.
 
 ### Jobs, worktrees and ports
-- Feature and bug job ids come from the issue number and a short slug (`042-signup-rate-limit`), or the slug alone on a local tracker. Triage, audit and retro jobs are named by type and date.
+- Feature and bug job ids are the issue number alone (`042`), or the slug on a local tracker. The slug goes in the branch name (`factory/042-signup-rate-limit`). Triage, audit and retro jobs are named by type and date.
+- `job.json` records `created_at` (ISO-8601, UTC) and `attempt`.
+- The factory runs from one machine and checkout at a time, because job state lives in a gitignored local folder. Running it from several places is a future improvement (below).
 - The integration branch and each ticket get their own worktree next to the repo.
 - Port: `20000 + 10 × (issue number mod 4000) + ticket`.
 
@@ -183,6 +186,7 @@ issue tracker to use.
   - `/factory grill` applies `ready-for-agent` to the request after an explicit yes, and leaves it at `needs-triage` after a no;
   - `/factory next` never picks a ticket, skips a request with an open review request, and ignores issues without `ready-for-agent`;
   - two sessions running `/factory next` at once take different issues;
+  - a blocked job whose issue is marked ready again is re-run, with its earlier `blocked.md` kept;
   - a request with two independent tickets builds them in parallel;
   - `code-review.md` exists with both sections, and deleting it blocks the job;
   - the review request has the `pr` skill's sections, `Closes <ref>` and `ready-for-human`;
@@ -221,5 +225,48 @@ issue tracker to use.
 - Copied skills drift from Matt's plugin. Re-copy them deliberately and update the recorded commits.
 - Scheduled `claude -p` runs need permissions granted ahead of time. `/factory schedule` asks how.
 - The port formula repeats after 4000 issues. Collisions only matter if two such jobs run at the same time.
-- Claiming by job folder only works for sessions sharing one checkout. Sessions on different machines could take the same issue.
+- Claiming by job folder only works for sessions sharing one checkout. Running the factory from two places at once can build the same issue twice until the future improvement below is in place.
 - The triager's model (opus) was set by analogy with the diagnoser and has not been confirmed by the owner.
+
+## Future improvements
+
+### Run the factory from several places
+
+**Status:** parked idea, not part of this build.
+
+**Goal:** let the factory run from several places against the same repo and
+tracker at once: one owner on two or more devices, cloud sessions, or several
+developers working concurrently. All of them should see the same jobs and the
+same job timeline, and never build the same issue twice.
+
+**Why it is not in this build:** job state lives in a gitignored local folder,
+so other places cannot see it. That affects claiming, the dashboard, the job
+timeline, "latest audit", "since the last retro", and resuming a blocked job
+from another machine. Fixing it means moving job state somewhere shared, which
+is a larger change than the rest of this spec.
+
+**Ideas from the grilling session:**
+- **Unique job id**: a hexadecimal id per job, 6 digits by default and 7 or 8 if
+  needed (`3f9a1c`). If ids are random, the chance that two jobs share one grows
+  with the number of jobs: with 1,000 jobs it is about 3% for 6 hex digits,
+  0.2% for 7, and 0.01% for 8. Ids taken through a shared lock (below) are
+  unique whatever their length. The issue number would stay in the branch name.
+- **Creation time**: `job.json` records `created_at` (already in this build),
+  plus `owner` (git user), `host` (machine) and a `history` of stage changes
+  with timestamps, so the dashboard can show one timeline across all places.
+- **Shared state**: keep job folders on an orphan `factory-state` branch on the
+  remote, checked out as a worktree. Every state change is a commit and a push.
+  A host rejects a push based on an outdated branch tip, which gives the
+  factory a lock that works on any git host and does not depend on the tracker.
+- **Claims**: the commit that creates a job also writes `claims/<issue>`. If two
+  places claim the same issue, their rebases conflict on that file, and the
+  second one backs off. A blocked job keeps its claim and pushes its
+  integration branch so that another place can take it over.
+- **Dashboard sync**: a `factory/serve.sh` that serves the dashboard and pulls
+  the state branch every 30 seconds.
+- **Local-markdown tracker**: Matt's local tracker keeps issues on the working
+  branch, so it would stay single-place, and setup would say so.
+
+**Open questions before building it:** random or sequential hex ids, and their
+length; whether state lives on a git branch or in the tracker; how a takeover
+of another place's blocked job is confirmed.

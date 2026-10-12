@@ -203,13 +203,14 @@ ON DEMAND  (human)
 factory/
   dashboard.html                   # visual board, polls job.json files
   jobs/                            # gitignored runtime state, one folder per job
-    042-signup-rate-limit/         # a feature job
+    042/                           # a feature job, named by issue number
       job.json
       code-review.md
       fixes.md
       review-request.md            # local code host only
       blocked.md                   # only when the job is blocked
-    043-login-redirect-loop/       # a bug job
+      blocked-1.md                 # an earlier block, kept when the job is re-run
+    043/                           # a bug job
       job.json
       diagnosis.md
       code-review.md
@@ -230,22 +231,28 @@ docs/agents/                       # written by /setup-matt-pocock-skills
 
 ## Jobs
 
-- **Job ids**: feature and bug jobs are `<NNN>-<slug>` from the issue number
-  (zero-padded) and a 2–4 word kebab-case slug, or `<slug>` alone on a
-  local-markdown tracker. Triage, audit and retro jobs are `<type>-<date>`.
-- **Worktrees**: the integration branch `factory/<job-id>` lives in
+- **Job ids**: a feature or bug job is named by its issue number alone,
+  zero-padded (`042`), or by the issue's slug on a local-markdown tracker. Two
+  sessions taking the same issue therefore always try to create the same
+  folder. Triage, audit and retro jobs are `<type>-<date>`.
+- **Branches and worktrees**: the integration branch is
+  `factory/<job-id>-<slug>`, with a 2–4 word kebab-case slug of the title, in
   `../<repo>-factory/<job-id>/`. Each ticket gets `factory/<job-id>-t<NN>` in
   `../<repo>-factory/<job-id>-t<NN>/`. The main checkout is the user's and may be
   dirty; only `/factory approve` on a local code host touches it.
+- **One place**: job state lives in the gitignored `factory/jobs/` of one
+  checkout, so the factory runs from one machine and checkout at a time. See
+  SPEC.md, Future improvements, for running it from several places.
 - **Ports**: the dev server port is `20000 + 10 × (issue number mod 4000) + ticket`.
 
 ### job.json
 
 ```json
-{ "id": "042-signup-rate-limit", "type": "feature", "ref": "#42",
+{ "id": "042", "type": "feature", "ref": "#42",
   "title": "Rate limit the signup form",
   "branch": "factory/042-signup-rate-limit",
-  "worktree": "/Users/you/code/my-app-factory/042-signup-rate-limit",
+  "worktree": "/Users/you/code/my-app-factory/042",
+  "created_at": "2026-10-12T09:14:03Z", "attempt": 1,
   "stage": "tickets",
   "tickets": [ { "ref": "#43", "state": "merged" }, { "ref": "#44", "state": "building" } ],
   "review": { "standards": "pending", "spec": "pending" },
@@ -260,6 +267,8 @@ docs/agents/                       # written by /setup-matt-pocock-skills
   - audit, retro: `running`, `report-ready`, `closed`, `superseded`
 - Ticket `state` is `pending`, `building` or `merged`. Review values are
   `pending`, `done` or `findings`.
+- `created_at` is when the job was created (ISO-8601, UTC). `attempt` counts
+  runs of the job, starting at 1.
 - Rewrite the whole file on every change. Paths are absolute.
 
 ## Example agent file
@@ -285,12 +294,19 @@ What this agent reads, what it does, and which file or branch it writes.
   `docs/agents/domain.md` lists, and uses the `GLOSSARY.md` vocabulary.
 - **Picking the next job**: `/factory next` takes the oldest issue that is
   labelled `ready-for-agent` and `enhancement` (`bug` for `next bug`) and is not
-  a sub-issue, so tickets are never picked. It skips any issue that already has
-  an open review request (one whose body says `Closes <ref>`) or a job folder,
-  and moves on to the next.
-- **Claiming**: a session claims an issue by creating its job folder with
-  `mkdir factory/jobs/<job-id>` (no `-p`) after checking no folder for that issue
-  number exists. If the `mkdir` fails, another session has it: pick the next one.
+  a sub-issue, so tickets are never picked. It skips any issue that has an open
+  review request (one whose body says `Closes <ref>`) or a job that is running
+  or at `review-request`, and moves on to the next.
+- **Claiming**: a session claims an issue with `mkdir factory/jobs/<job-id>`
+  (no `-p`). If the folder already exists, read its `job.json`: if the stage is
+  `blocked`, re-run that job (below); otherwise another session has the issue,
+  so pick the next one.
+- **Re-running a blocked job**: when a blocked job's issue is `ready-for-agent`
+  again, rename `blocked.md` to `blocked-<k>.md` (the next unused `k`), add one to
+  `attempt`, and build again in the same worktrees. Keep the tickets already
+  merged into the integration branch only if their text has not changed since
+  they merged; reset the rest to `pending`. A bug job starts the diagnosis
+  again.
 - **code-review runs once per build.** One implementer fixes every finding in a
   single pass and writes `fixes.md`. Before the review request opens, the
   orchestrator checks that `code-review.md` exists, has `## Standards` and
