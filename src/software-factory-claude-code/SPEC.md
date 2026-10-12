@@ -166,13 +166,13 @@ issue tracker to use.
 - `job.json` records `created_at` (ISO-8601, UTC) and `attempt`.
 - The factory runs from one machine and checkout at a time, because job state lives in a gitignored local folder. Running it from several places is a future improvement (below).
 - The integration branch and each ticket get their own worktree next to the repo.
-- Port: `20000 + 10 × (issue number mod 4000) + ticket`.
+- Dev server port per ticket: `20000 + 10 × (issue number mod 4000) + ticket`. These ports are for the app under development, so implementers on parallel tickets can each run its dev server without a clash. They have nothing to do with the dashboard.
 
 ### Models
 - Orchestrator: opus. Implementers: sonnet. Merger: sonnet. Bug diagnoser: opus. Code-review checks: opus. Triager, auditor and retro: opus.
 
 ### Dashboard
-- Local HTML file polling every `job.json`. One swimlane per job type (feature, bug, triage, audit, retro) with that type's stages. Feature cards show a chip per ticket and Standards/Spec chips. Blocked jobs and review requests waiting on the owner stand out. Cards link to their issue and review request. Triage, audit and retro cards open `report.html`.
+- One local HTML file on one fixed port (8765) covering the whole factory, polling every `job.json`. One swimlane per job type (feature, bug, triage, audit, retro) with that type's stages. Feature cards show a chip per ticket and Standards/Spec chips. Blocked jobs and review requests waiting on the owner stand out. Cards link to their issue and review request. Triage, audit and retro cards open `report.html`.
 
 ## Testing Decisions
 
@@ -225,7 +225,7 @@ issue tracker to use.
 ### Open risks
 - Copied skills drift from Matt's plugin. Re-copy them deliberately and update the recorded commits.
 - Scheduled `claude -p` runs need permissions granted ahead of time. `/factory schedule` asks how.
-- The port formula repeats after 4000 issues. Collisions only matter if two such jobs run at the same time.
+- The dev server port formula repeats after 4000 issues. Collisions only matter if two such jobs run at the same time.
 - Claiming by job folder only works for sessions sharing one checkout. Running the factory from two places at once can build the same issue twice until the future improvement below is in place.
 - The triager's model (opus) was set by analogy with the diagnoser and has not been confirmed by the owner.
 

@@ -279,7 +279,10 @@ docs/agents/                       # written by /setup-matt-pocock-skills
 - **One place**: job state lives in the gitignored `factory/jobs/` of one
   checkout, so the factory runs from one machine and checkout at a time. See
   SPEC.md, Future improvements, for running it from several places.
-- **Ports**: the dev server port is `20000 + 10 × (issue number mod 4000) + ticket`.
+- **Dev server ports**: these are for the app under development, not the
+  dashboard. Implementers on parallel tickets each start the app's dev server in
+  their own worktree, so each needs its own port:
+  `20000 + 10 × (issue number mod 4000) + ticket`.
 
 ### job.json
 
@@ -487,7 +490,9 @@ confirm.
 
 ## Dashboard
 
-One self-contained HTML file, served with `python3 -m http.server` from factory/.
+One self-contained HTML file, served from factory/ with
+`python3 -m http.server 8765`. This is the only dashboard: one page on one fixed
+port shows every job.
 It polls every `jobs/*/job.json`. One swimlane per job type, with cards moving
 across that type's stages. Feature cards show a chip per ticket that fills in as
 tickets merge, and a Standards and a Spec chip for code-review. `blocked` jobs
