@@ -69,8 +69,35 @@ _Avoid_: status
 - The `mattpocock-skills` plugin is installed
   (`claude plugin install mattpocock-skills@claude-plugins-official`). If it
   isn't, tell the user and stop.
-- The repo has an `AGENTS.md` or `CLAUDE.md` that says how to set up a fresh
-  checkout, start the dev server on a given port, and run tests, build and lint.
+- The project commands are recorded in `AGENTS.md`. This is not a hard stop:
+  the build finds or asks for them (see **Project commands**).
+
+## Project commands
+
+Every job runs these commands, so they must be written down once rather than
+guessed by each agent:
+
+- **Setup**: prepare a fresh checkout (install dependencies, copy env files).
+- **Dev server**: start the app on a given port.
+- **Test**: run the test suite. `tdd` and the merger need it.
+- **Build** and **lint**: checked before each ticket merges, and before
+  `/factory approve` merges on a local code host.
+
+During the build:
+
+1. Look for each command in `AGENTS.md` or `CLAUDE.md`, then in the repo's build
+   files (`package.json` scripts, `Makefile`, `pyproject.toml`, `justfile`, CI
+   config).
+2. Show the user one table: each command, what was found and where, or
+   "missing". Ask them to confirm it, correct it, or fill the gaps.
+3. Write the confirmed commands into a `## Project commands` section of
+   `AGENTS.md`, creating `AGENTS.md` if neither file exists. If only `CLAUDE.md`
+   exists, add the section there. Leave the rest of the file unchanged.
+
+Test is required; if the user can't give one, stop. Setup, build and lint may be
+recorded as "none". The dev server may be recorded as "none" for a repo with no
+app to run, such as a library or CLI; implementers then start no server and use
+no port.
 
 ## Issue tracker and code host
 
@@ -282,7 +309,8 @@ docs/agents/                       # written by /setup-matt-pocock-skills
 - **Dev server ports**: these are for the app under development, not the
   dashboard. Implementers on parallel tickets each start the app's dev server in
   their own worktree, so each needs its own port:
-  `20000 + 10 × (issue number mod 4000) + ticket`.
+  `20000 + 10 × (issue number mod 4000) + ticket`. If the dev server command is
+  "none", no ports are assigned.
 
 ### job.json
 
@@ -416,7 +444,7 @@ yes. Otherwise leave it at `needs-triage`. Never apply it on your own judgement.
 ### /factory next, /factory \<ref> (request)
 
 Pick and claim, create the job and the integration worktree from `main`, run the
-fresh checkout setup from AGENTS.md, then follow the factory's `implement-spec`
+setup command from AGENTS.md, then follow the factory's `implement-spec`
 skill: implementers on the ready tickets in parallel (each in its own worktree
 and port, with `tdd`), a merger after each, more implementers as tickets
 unblock, then `code-review` once and one fix pass. Verify `code-review.md`, then
@@ -433,7 +461,7 @@ once, one fix pass, verify, and the review request, as above.
 ### /factory approve \<review>
 
 Check the review request is mergeable and the code host's checks pass (on a
-local code host, run AGENTS.md's validation commands in the worktree). If not,
+local code host, run AGENTS.md's test, build and lint commands in the worktree). If not,
 stop and say why. Otherwise squash-merge into `main`, delete the branches,
 close `<ref>` and its tickets, remove the job's worktrees, and set `merged`.
 
@@ -503,12 +531,13 @@ retro cards show `report.html` in a panel. Clean and minimal.
 ## After building
 
 1. Add `/factory/jobs/` to `.gitignore`.
-2. Run `/setup-matt-pocock-skills` so the user picks their issue tracker, triage
+2. Record the project commands, as **Project commands** describes.
+3. Run `/setup-matt-pocock-skills` so the user picks their issue tracker, triage
    labels and domain doc layout. It is user-invoked only, so if the Skill tool
    refuses it, read its `SKILL.md` from the installed plugin and follow it step
    by step in this session, asking the user each question it asks.
-3. Add the factory's terms to the glossary, as **Glossary** describes.
-4. Create the three factory labels (`factory:audit`, `factory:retro`,
+4. Add the factory's terms to the glossary, as **Glossary** describes.
+5. Create the three factory labels (`factory:audit`, `factory:retro`,
    `superseded`) in the chosen tracker, following `docs/agents/issue-tracker.md`.
-5. Tell the user which code host the factory detected for review requests, and
+6. Tell the user which code host the factory detected for review requests, and
    that `/factory schedule` sets up the triage, audit and retro runs.

@@ -96,6 +96,7 @@ issue tracker to use.
 33. As the owner, I want the build to finish by running `/setup-matt-pocock-skills`, so that I choose my tracker during setup.
 34. As the owner, I want several factory sessions to run at once without taking the same issue, so that I can build in parallel.
 35. As the owner, I want a dashboard with a swimlane per job type, so that I can see every job's stage at a glance.
+36. As the owner, I want the build to find my setup, dev server, test, build and lint commands and ask me to confirm them, so that every job runs the same commands without my having to write `AGENTS.md` first.
 
 ## Implementation Decisions
 
@@ -161,12 +162,16 @@ issue tracker to use.
 - The code host is detected from the git remote, independent of the tracker: GitHub pull request, GitLab merge request, or a local review request file when there is no remote.
 - The build prompt checks that the plugin is installed and stops if not. It ends by running `/setup-matt-pocock-skills`. If the Skill tool refuses it because it is user-invoked only, the agent reads its instructions and follows them in the same session. The three factory labels are then created in the chosen tracker.
 
+### Project commands
+- The setup, dev server, test, build and lint commands are not a hard prerequisite. The build looks for them in `AGENTS.md`/`CLAUDE.md`, then in the repo's build files, shows the owner what it found and what is missing, and writes the confirmed commands to a `## Project commands` section of `AGENTS.md` (or `CLAUDE.md` if that is the only one).
+- Test is required; the build stops without one. The others may be "none". With no dev server, implementers start no server and no ports are assigned.
+
 ### Jobs, worktrees and ports
 - Feature and bug job ids are the issue number alone (`042`), or the slug on a local tracker. The slug goes in the branch name (`factory/042-signup-rate-limit`). Triage, audit and retro jobs are named by type and date.
 - `job.json` records `created_at` (ISO-8601, UTC) and `attempt`.
 - The factory runs from one machine and checkout at a time, because job state lives in a gitignored local folder. Running it from several places is a future improvement (below).
 - The integration branch and each ticket get their own worktree next to the repo.
-- Dev server port per ticket: `20000 + 10 × (issue number mod 4000) + ticket`. These ports are for the app under development, so implementers on parallel tickets can each run its dev server without a clash. They have nothing to do with the dashboard.
+- Dev server port per ticket: `20000 + 10 × (issue number mod 4000) + ticket`. No ports are assigned when the dev server is "none". These ports are for the app under development, so implementers on parallel tickets can each run its dev server without a clash. They have nothing to do with the dashboard.
 
 ### Models
 - Orchestrator: opus. Implementers: sonnet. Merger: sonnet. Bug diagnoser: opus. Code-review checks: opus. Triager, auditor and retro: opus.
@@ -179,6 +184,7 @@ issue tracker to use.
 - A good test of this blueprint checks the factory's behaviour from the owner's side, not the wording of generated files.
 - Build the factory from `BUILD_PROMPT.md` in a scratch repo with a test suite, once per tracker: GitHub, GitLab, local markdown. For each, check:
   - the build stops when the plugin is missing;
+  - commands found in `package.json` or a `Makefile` are shown for confirmation and written to `AGENTS.md`, and the build stops when there is no test command;
   - setup asks for the tracker and creates the three factory labels;
   - the factory terms are appended to an existing `GLOSSARY.md` without changing its terms, and a root `GLOSSARY.md` is created when there is none;
   - nightly triage applies categories, reproduces a seeded bug, posts recommendations, and never applies `ready-for-agent`, `ready-for-human` or `wontfix` or closes an issue;
