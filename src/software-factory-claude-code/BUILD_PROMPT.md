@@ -124,7 +124,8 @@ tracker the user describes.
 ## Labels and the issue lifecycle
 
 The factory adds only three labels of its own: `factory:audit`, `factory:retro`
-and `superseded`. Everything else is Matt's: the categories `enhancement` and
+and `superseded`. `superseded` marks an audit or retro issue replaced by a newer
+run, or a request closed because it was split. Everything else is Matt's: the categories `enhancement` and
 `bug`, and the five state labels.
 
 ```
@@ -132,6 +133,7 @@ Request (enhancement)
   no state / needs-triage ──nightly triage──► needs-triage + recommendation   (or needs-info)
         │
         ▼ /factory grill <ref>: grilling, spec, /to-tickets, "Mark ready now?" yes
+        │   (or split: closed as superseded, new requests at needs-triage)
   ready-for-agent ──/factory next──► job builds ──► review request labelled ready-for-human
         ▲                                │                          │
         └──── job blocked: needs-triage ◄┘                          ▼ /factory approve
@@ -206,6 +208,8 @@ INTAKE  (human + agent, interactive)
     request: grilling + domain-modeling → spec into <ref> → /to-tickets
     bug:     grilling + domain-modeling → agent brief into <ref>
     "Mark <ref> ready now?"  yes → ready-for-agent
+    too big → split: new requests at needs-triage, <ref> closed as superseded,
+              keep grilling the one the user picks
 
   /factory <ref> on an issue that isn't ready-for-agent
     offers the same grilling, then "Build <ref> now?"  yes → ready-for-agent → BUILD
@@ -368,8 +372,9 @@ What this agent reads, what it does, and which file or branch it writes.
 - **Picking the next job**: `/factory next` takes the oldest issue that is
   labelled `ready-for-agent` and `enhancement` (`bug` for `next bug`) and is not
   a sub-issue, so tickets are never picked. It skips any issue that has an open
-  review request (one whose body says `Closes <ref>`) or a job that is running
-  or at `review-request`, and moves on to the next.
+  review request (one whose body says `Closes <ref>`), a job that is running
+  or at `review-request`, or a blocking edge to an open request (from a split),
+  and moves on to the next.
 - **Claiming**: a session claims an issue with `mkdir factory/jobs/<job-id>`
   (no `-p`). If the folder already exists, read its `job.json`: if the stage is
   `blocked`, re-run that job (below); otherwise another session has the issue,
@@ -444,8 +449,31 @@ shared understanding:
 - For a bug, write an agent brief in the format of the `triage` skill's
   AGENT-BRIEF.md into `<ref>`.
 
+Before writing the spec, offer to split a request that is too big for one job.
+See **Splitting a request** below.
+
 Finally ask "Mark <ref> ready now?" Apply `ready-for-agent` only on an explicit
 yes. Otherwise leave it at `needs-triage`. Never apply it on your own judgement.
+
+### Splitting a request
+
+One job ends in one review request, so a request should be small enough to
+review in one sitting. During grilling, offer to split a request when it covers
+parts that could each ship and be reviewed on their own, or when `/to-tickets`
+would produce more than eight tickets. The user can also say "split" at any
+point. Only the user decides; never split on your own judgement.
+
+On a split:
+
+1. Agree with the user on the new requests: a title and a scope for each, and
+   which depend on which.
+2. Create each as a new `enhancement` issue at `needs-triage`, with its scope,
+   a `## Grilling notes` section holding the decisions settled so far that apply
+   to it, and "Split from <ref>". Record the dependencies as blocking edges.
+3. Comment on `<ref>` with a link to each new request, label it `superseded`,
+   and close it as not planned. Close any tickets already published under it.
+4. Ask which new request to grill now and continue the session with it. The
+   rest wait for `/factory grill` or `/factory <ref>`.
 
 ### /factory \<ref> on an issue that isn't ready
 

@@ -98,6 +98,7 @@ issue tracker to use.
 35. As the owner, I want a dashboard with a swimlane per job type, so that I can see every job's stage at a glance.
 36. As the owner, I want the build to find my setup, dev server, test, build and lint commands and ask me to confirm them, so that every job runs the same commands without my having to write `AGENTS.md` first.
 37. As the owner, I want `/factory <ref>` on a request or bug that isn't ready to offer to grill it and then build it in the same session, so that I don't need two commands when I want it built now.
+38. As the owner, I want to split a request that is too big for one job into several requests during grilling, with the original closed and linking to them, so that each job ends in a review request I can review in one sitting.
 
 ## Implementation Decisions
 
@@ -109,7 +110,7 @@ issue tracker to use.
 
 ### Labels and lifecycle
 - Requests and bugs use Matt's five state labels and his `enhancement` / `bug` categories, unchanged.
-- The factory adds only `factory:audit`, `factory:retro` and `superseded`. Labels considered and dropped: `ready-for-implementation`, `needs-human`, `factory:in-progress`, `factory:review`.
+- The factory adds only `factory:audit`, `factory:retro` and `superseded`. `superseded` marks a replaced audit or retro issue, or a request closed because it was split. Labels considered and dropped: `ready-for-implementation`, `needs-human`, `factory:in-progress`, `factory:review`.
 - A request goes: no state or `needs-triage` → (nightly triage recommends) → `/factory grill` → `ready-for-agent` → job → review request → `/factory approve` → closed. A bug goes the same way, with triage reproducing it and either a one-word accept or `/factory grill` producing an agent brief.
 - Tickets carry `ready-for-agent`, as `/to-tickets` applies it.
 - Review requests carry `ready-for-human`, Matt's meaning for a PR ready for a human to merge. On a request or bug, `ready-for-human` keeps Matt's meaning (a person must implement it) and the factory never builds it.
@@ -130,6 +131,7 @@ issue tracker to use.
 ### Intake
 - `/factory grill <ref>` runs grilling with domain modeling (glossary and ADRs updated as decisions are settled). For a request it writes the spec in the `/to-spec` template into the same issue under `## Spec`, then runs `/to-tickets` with the owner. A small request may have one ticket. For a bug it writes an agent brief in `/triage`'s format.
 - It ends by asking "Mark <ref> ready now?" and applies `ready-for-agent` only on an explicit yes. Otherwise the issue stays at `needs-triage` and the owner applies the label later.
+- Splitting: during grilling the factory offers to split a request that covers parts that could ship and be reviewed separately, or that would produce more than eight tickets; the owner can also ask. Only the owner decides. Each new request is an `enhancement` issue at `needs-triage` with its scope, the grilling notes that apply to it, a link back, and blocking edges for dependencies. The original gets a comment linking them, the `superseded` label, and is closed as not planned, along with any tickets already under it. The session continues grilling the new request the owner picks. `/factory next` skips a request blocked by an open request.
 - `<ref>` accepts the tracker's form (`#42`), a bare number (`42`) or the job id (`042`). A number that is a review request rather than an issue is refused.
 - `/factory <ref>` on an issue that isn't `ready-for-agent` offers the same grilling, then asks "Build <ref> now?". A yes applies `ready-for-agent` and starts the build in the same session. An issue already grilled gets "Mark <ref> ready and build now?". A `needs-info` issue gets a warning that it is waiting on the reporter, then the same offer. A `wontfix`, closed or uncategorised issue is refused. `/factory grill` stays for grilling without building.
 
@@ -194,6 +196,7 @@ issue tracker to use.
   - `/factory status` lists the recommendations and `accept` applies them;
   - `/factory grill` writes the spec into the same issue and creates tickets with blocking edges and `ready-for-agent`;
   - `/factory grill` applies `ready-for-agent` to the request after an explicit yes, and leaves it at `needs-triage` after a no;
+  - splitting a request creates the new requests at `needs-triage` with blocking edges, closes the original as `superseded` with links, and `/factory next` won't pick a request blocked by an open one;
   - `/factory 42`, `/factory #42` and `/factory 042` all act on issue #42;
   - `/factory <ref>` on an ungrilled request offers grilling, and after "Build now?" yes creates the job in the same session; after a no, no job is created;
   - `/factory next` never picks a ticket, skips a request with an open review request, and ignores issues without `ready-for-agent`;
